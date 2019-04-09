@@ -3,7 +3,7 @@ const validator = require('validator');
 const runner = require('./runner');
 const { isSanitizer, isValidator } = require('../utils/filters');
 
-module.exports = (fields, locations, message) => {
+module.exports = (fields, locations, message, customValidators, customSanitizers) => {
   let optional;
   const validators = [];
   const sanitizers = [];
@@ -69,6 +69,34 @@ module.exports = (fields, locations, message) => {
     });
     return middleware;
   };
+
+  Object.keys(customValidators || {})
+    .forEach(methodName => {
+      const validationFn = customValidators[methodName];
+      middleware[methodName] = (...options) => {
+        validators.push({
+          negated: middleware._context.negateNext,
+          validator: validationFn,
+          custom: true,
+          options
+        });
+        middleware._context.negateNext = false;
+        return middleware;
+      };
+    });
+
+  Object.keys(customSanitizers || {})
+    .forEach(methodName => {
+      const sanitizerFn = customSanitizers[methodName];
+      middleware[methodName] = (...options) => {
+        sanitizers.push({
+          sanitizer: sanitizerFn,
+          custom: true,
+          options
+        });
+        return middleware;
+      };
+    });
 
   middleware.exists = (options = {}) => {
     const validator = options.checkFalsy
